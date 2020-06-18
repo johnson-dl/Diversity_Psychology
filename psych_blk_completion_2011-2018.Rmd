@@ -1,0 +1,107 @@
+---
+title: "IPEDS Completion Data - Black Students - Psychology PhD - 2011-2018"
+author: "Devin Johnson"
+date: "6/12/2020"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+Source: [IPEDS](https://nces.ed.gov/ipeds/).
+More details on data base [here](https://surveys.nces.ed.gov/ipeds/VisInstructions.aspx?survey=10&id=30080&show=all).
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(gt)
+library(dplyr)
+```
+
+```{r,echo=FALSE}
+files <- paste0("data/C", 2011:2018, "_A.csv")
+
+data <- do.call(plyr::rbind.fill, lapply(files, read_csv))
+
+#CIPCODES for Psychology fields
+look_up <- readxl::read_excel("codes-to-areas.xlsx") %>% mutate(CIPCODE = as.character(CIPCODE))
+
+data2 <- data %>%
+  left_join(look_up, by = "CIPCODE")
+
+psych <- data2 %>% 
+  filter(
+    CIPCODE %in% c("42.0101", "42.2701",	"42.2702",	"42.2703",	"42.2704",	"42.2705",	"42.2706",	"42.2707",	"42.2708",	"42.2709",	"42.2799",
+"42.2801",	"42.2802",	"42.2803",	"42.2804",	"42.2805",	"42.2806",	"42.2807",	"42.2808",	"42.2809",	"42.281",	"42.2811",	"42.2812",	"42.2813",	"42.2814",	"42.2899","42.9999") & 
+      UNITID %in% c(110635, 186131, 130794, 193900, 166027, 166683, 243744,
+                    110680, 110662, 170976, 199120, 190150, 198419, 144050,
+                    204796)) %>%
+  mutate(University = case_when(UNITID == 110635 ~ "UC Berkeley",
+                                UNITID == 186131 ~ "Princeton",
+                                UNITID == 130794 ~ "Yale",
+                                UNITID == 193900 ~ "NYU",
+                                UNITID == 166027 ~ "Harvard",
+                                UNITID == 166683 ~ "MIT",
+                                UNITID == 243744 ~ "Stanford",
+                                UNITID == 110680 ~ "UCSD",
+                                UNITID == 110662 ~ "UCLA",
+                                UNITID == 170976 ~ "UMich",
+                                UNITID == 199120 ~ "UNC-Chapel Hill",
+                                UNITID == 190150 ~ "Columbia",
+                                UNITID == 198419 ~ "Duke",
+                                UNITID == 144050 ~ "U Chicago",
+                                UNITID == 204796 ~ "Ohio State University"))
+```
+
+
+
+```{r,echo=FALSE}
+psych %>% 
+  count(psych_area, sort = TRUE) %>%
+  head(20) %>%
+  mutate(psych_area = fct_reorder(psych_area, n)) %>%
+  ggplot(aes(psych_area, n)) +
+  geom_col()+
+  coord_flip()+
+  labs(title = "Top 20 Content Areas",
+       x = "Content Area",
+       y = "Count")
+```
+
+
+```{r,echo=FALSE}
+theme_set(theme_light())
+
+graph <- psych %>% group_by(University) %>% 
+  summarize(Total = sum(CBKAAT[AWLEVEL == 17], na.rm=TRUE),
+            Share = sum(CBKAAT[AWLEVEL == 17], na.rm=TRUE)/
+              sum(CTOTALT[AWLEVEL == 17], na.rm=TRUE)) %>%
+  mutate(University = fct_reorder(University, Share)) %>%
+  ggplot(aes(University, Share, fill = University))+
+  geom_col()+
+  coord_flip()+
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Black Students Who Completed a Psychology PhD Program",
+       y = "Percentage",
+       subtitle = "2011 - 2018  - Top 15 universities based on US News 2017 Rankings")+
+  theme(legend.position = "none")
+
+graph
+
+```
+
+```{r,echo=FALSE}
+library(gt)
+psych %>% group_by(University) %>% 
+  summarize(Total = sum(CBKAAT[AWLEVEL == 17], na.rm=TRUE),
+             Percent = 100 * sum(CBKAAT[AWLEVEL == 17], 
+                    na.rm=TRUE)/sum(CTOTALT[AWLEVEL == 17], na.rm=TRUE)) %>%
+  arrange(desc(Percent)) %>%
+  gt() %>%
+  tab_source_note("Data Source: National Center for Education Statistics") %>%
+  tab_options(column_labels.background.color = "black")
+  
+```
+
+
+
+Note: Data used in Table 1 above does not include race/ethnicity of non-resident aliens. These are therefore excluded from the Black counts, though these students are included in the denominator in the percentage column. Top 15 programs according to [USNews 2017 Rankings](https://www.usnews.com/best-graduate-schools/top-humanities-schools/political-science-rankings).
